@@ -1,7 +1,7 @@
 """Tiny key/value store for app preferences (saved in the same SQLite file)."""
 from .db import execute, query
 
-DEFAULTS = {"calc_base": "both"}  # which money the dashboard plan is calculated from
+DEFAULTS = {"calc_base": "both", "theme": "light"}  # dashboard plan and appearance preferences
 
 def get(key):
     rows = query("SELECT value FROM settings WHERE key=?", (key,))

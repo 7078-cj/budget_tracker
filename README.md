@@ -13,7 +13,9 @@ Built with Python, Tkinter and SQLite. There is nothing to install except Python
 
 - **Three account types:** Bank, Cash on hand, Spending.
 - **Money on hand:** calculated for you as `bank + cash on hand - spending`.
-- **Your percentages:** set the % for Savings, Guilt-free, Investment, Emergency fund and Needs & bills. The percentages must total 100%.
+- **Your percentages:** use sliders or enter percentages for Savings, Guilt-free, Investment, Emergency fund and Needs & bills. Adjustments keep the total at 100%.
+- **Night mode:** switch between light and dark appearance with the sidebar toggle. Your choice is saved locally.
+- **Sidebar navigation:** jump between Dashboard, Accounts, Transactions and Allocation % from the left sidebar.
 - **Dashboard:** money on hand, a four-card plan (guilt-free, invest, emergency fund, bills), a donut chart of the split, money added vs spending per month, and recent transactions. It refreshes by itself when you change anything.
 - **Emergency fund goal:** shows 3 to 6 months of your average monthly spending as a target.
 - **Local data:** everything is stored in one SQLite file on your computer.
@@ -32,8 +34,9 @@ On Linux you may need Tkinter first: `sudo apt install python3-tk`.
 
 1. **Accounts tab:** create your accounts, for example `BPI` (Bank), `Wallet` (Cash on hand) and `Food` (Spending).
 2. **Transactions tab:** record your current money once as a positive amount on a Bank or Cash on hand account. This is your starting balance. After that, add money whenever you receive some, and log expenses on a Spending account.
-3. **Allocation % tab:** set a percentage for each category, including Needs & bills. The percentages must add up to exactly 100%.
+3. **Allocation % tab:** use the sliders or type percentages directly. Changing Needs & bills rebalances the other categories proportionally; changing another category updates the Needs & bills share. Press Enter or leave the field to apply a typed value.
 4. **Dashboard tab:** see your plan. Amounts are your percentages applied to your money on hand right now.
+5. Use the left sidebar to switch tabs or toggle night mode. The appearance preference is remembered the next time you open the app.
 
 Amounts are always entered as positive numbers. The account type decides whether money goes in or out. Dates use `YYYY-MM-DD`.
 
