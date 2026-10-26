@@ -1,4 +1,4 @@
-"""SQLite connection, schema, and the one generic Repository every table reuses."""
+"""SQLite connection, schema, upgrades, and the one generic Repository every table reuses."""
 import os
 import sqlite3
 from pathlib import Path
@@ -16,11 +16,13 @@ CREATE TABLE IF NOT EXISTS transactions(
   date TEXT NOT NULL,
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   amount REAL NOT NULL,
-  note TEXT DEFAULT '');
+  note TEXT DEFAULT '',
+  source TEXT CHECK(source IN ('bank','cash')));
 CREATE TABLE IF NOT EXISTS buckets(
   id INTEGER PRIMARY KEY,
   label TEXT NOT NULL UNIQUE,
   percent REAL NOT NULL CHECK(percent BETWEEN 0 AND 100));
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 DEFAULT_BUCKETS = [("Savings", 20), ("Guilt-free", 10), ("Investment", 10), ("Emergency fund", 10)]
 
@@ -43,6 +45,15 @@ def _migrate_accounts(conn):
         COMMIT;""")
     conn.execute("PRAGMA foreign_keys=ON")
 
+def _migrate_transactions(conn):
+    """Add 'source': where spending was paid from, or whether a cash top-up came out of the bank."""
+    if "source" in [r["name"] for r in conn.execute("PRAGMA table_info(transactions)")]:
+        return
+    conn.execute("ALTER TABLE transactions ADD COLUMN source TEXT CHECK(source IN ('bank','cash'))")
+    # earlier versions pooled all spending; treat what's already recorded as paid from the bank
+    conn.execute("UPDATE transactions SET source='bank' "
+                 "WHERE account_id IN (SELECT id FROM accounts WHERE type='spending')")
+
 _conn = None
 
 def get_conn():
@@ -54,6 +65,7 @@ def get_conn():
         _conn.execute("PRAGMA foreign_keys=ON")
         _conn.executescript(SCHEMA)
         _migrate_accounts(_conn)
+        _migrate_transactions(_conn)
         _conn.executemany("INSERT OR IGNORE INTO buckets(label, percent) VALUES(?,?)", DEFAULT_BUCKETS)
         _conn.commit()
     return _conn

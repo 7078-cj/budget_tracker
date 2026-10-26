@@ -1,8 +1,8 @@
-"""Reusable building blocks: lbl(), Card, Form, Table, money()."""
+"""Reusable building blocks: lbl, Card, Form, Segmented, Table, money()."""
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox
-from .theme import BORDER, CARD, FONT, MUTED, TEXT
+from .theme import BORDER, CARD, FONT, MUTED, PRIMARY, TEXT
 
 def money(v):
     return f"₱{v:,.2f}"
@@ -23,11 +23,12 @@ class Form(tk.Frame):
     """fields: [(key, label, choices|None, default)]"""
     def __init__(self, master, fields, on_submit, button="Add"):
         super().__init__(master, bg=CARD)
-        self.vars, self.widgets, self.on_submit = {}, {}, on_submit
+        self.vars, self.widgets, self.labels, self.on_submit = {}, {}, {}, on_submit
         for i, (key, label, choices, default) in enumerate(fields):
             cell = tk.Frame(self, bg=CARD)
             cell.grid(row=0, column=i, padx=(0, 12))
-            lbl(cell, label, 9, fg=MUTED).pack(anchor="w")
+            self.labels[key] = lbl(cell, label, 9, fg=MUTED)
+            self.labels[key].pack(anchor="w")
             var = self.vars[key] = tk.StringVar(value=default)
             w = self.widgets[key] = (
                 ttk.Combobox(cell, textvariable=var, values=choices, state="readonly", width=18)
@@ -35,6 +36,9 @@ class Form(tk.Frame):
             w.pack(fill="x")
         ttk.Button(self, text=button, style="Primary.TButton",
                    command=self._submit).grid(row=0, column=len(fields), sticky="s")
+
+    def set_label(self, key, text):
+        self.labels[key].config(text=text)
 
     def set_choices(self, key, choices):
         self.widgets[key]["values"] = choices
@@ -46,6 +50,17 @@ class Form(tk.Frame):
             self.on_submit({k: v.get().strip() for k, v in self.vars.items()})
         except (ValueError, sqlite3.IntegrityError) as e:
             messagebox.showerror("Can't save", str(e))
+
+class Segmented(tk.Frame):
+    """Pill-style selector. options: [(value, label)]. Calls on_change(value) when clicked."""
+    def __init__(self, master, options, value, on_change):
+        super().__init__(master, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+        for val, text in options:
+            on = val == value
+            b = tk.Label(self, text=text, font=(FONT, 9, "bold"), padx=12, pady=5, cursor="hand2",
+                         bg=PRIMARY if on else CARD, fg="white" if on else MUTED)
+            b.pack(side="left", padx=2, pady=2)
+            b.bind("<Button-1>", lambda e, v=val: on_change(v))
 
 class Table(ttk.Treeview):
     """columns: [(key, heading, width)]. Rows are dicts with an 'id'."""

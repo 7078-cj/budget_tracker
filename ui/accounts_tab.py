@@ -7,7 +7,7 @@ BY_LABEL = {label: key for key, label in TYPE_LABELS.items()}
 class AccountsTab(CrudTab):
     repo = accounts
     fields = [("name", "Name", None, ""), ("type", "Type", list(BY_LABEL), "Bank")]
-    columns = [("name", "Name", 220), ("type", "Type", 130), ("balance", "Balance", 140)]
+    columns = [("name", "Name", 220), ("type", "Type", 130), ("balance", "Total recorded", 140)]
 
     def to_record(self, v):
         return {"name": v["name"], "type": BY_LABEL[v["type"]]}

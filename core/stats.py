@@ -1,20 +1,30 @@
-from .accounts import TYPES
 from .allocation import split
 from .buckets import buckets
+from . import settings
 from .db import query
 from .transactions import transactions
 
+BASES = ("both", "bank", "cash")
+
 def summary():
-    """Money on hand = money added to bank + cash on hand - spending."""
-    totals = dict.fromkeys(TYPES, 0.0)
-    for r in query("""SELECT a.type, COALESCE(SUM(t.amount),0) total FROM accounts a
-                      LEFT JOIN transactions t ON t.account_id=a.id GROUP BY a.type"""):
-        totals[r["type"]] = r["total"]
-    available = totals["bank"] + totals["cash"] - totals["spending"]
+    """Bank and cash on hand are tracked separately. Spending comes out of the source you picked,
+    and cash topped up from the bank lowers the bank. The plan uses the base chosen on the dashboard."""
+    r = query("""SELECT
+        COALESCE(SUM(CASE WHEN a.type='bank' THEN t.amount END), 0) bank_in,
+        COALESCE(SUM(CASE WHEN a.type='cash' THEN t.amount END), 0) cash_in,
+        COALESCE(SUM(CASE WHEN a.type='cash' AND t.source='bank' THEN t.amount END), 0) withdrawn,
+        COALESCE(SUM(CASE WHEN a.type='spending' AND t.source='cash' THEN t.amount END), 0) spent_cash,
+        COALESCE(SUM(CASE WHEN a.type='spending' AND IFNULL(t.source,'bank')!='cash' THEN t.amount END), 0) spent_bank
+        FROM transactions t JOIN accounts a ON a.id=t.account_id""")[0]
+    bank = r["bank_in"] - r["withdrawn"] - r["spent_bank"]
+    cash = r["cash_in"] - r["spent_cash"]
+    base = settings.get("calc_base")
+    base = base if base in BASES else "both"
+    available = {"both": bank + cash, "bank": bank, "cash": cash}[base]
     return {
-        "totals": totals,
-        "available": available,
-        "allocation": split(max(available, 0), buckets.all()),  # your money, split by bucket %
+        "bank": bank, "cash": cash, "spent": r["spent_bank"] + r["spent_cash"],
+        "total": bank + cash, "base": base, "available": available,
+        "allocation": split(max(available, 0), buckets.all()),  # the chosen money, split by bucket %
     }
 
 def monthly(n=6):
@@ -25,6 +35,7 @@ def monthly(n=6):
                              CASE a.type WHEN 'spending' THEN 'spending' ELSE 'income' END kind,
                              SUM(t.amount) total
                       FROM transactions t JOIN accounts a ON a.id=t.account_id
+                      WHERE NOT (a.type='cash' AND IFNULL(t.source,'')='bank')  -- bank to cash is a transfer
                       GROUP BY month, kind"""):
         data.setdefault(r["month"], {"income": 0.0, "spending": 0.0})[r["kind"]] = r["total"]
     return [{"month": m, **data[m]} for m in sorted(data)[-n:]]

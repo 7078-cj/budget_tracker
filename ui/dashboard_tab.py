@@ -1,13 +1,16 @@
 import tkinter as tk
 from tkinter import ttk
-from core import events, stats
+from core import events, settings, stats
 from core.allocation import REST_LABEL
 from . import charts
 from .theme import (BAD, BG, CARD, GOOD, MUTED, PALETTE, PRIMARY, PRIMARY_DK,
                     PRIMARY_LT, PRIMARY_LT2, PRIMARY_MID, TEXT)
-from .widgets import Card, lbl, money
+from .widgets import Card, Segmented, lbl, money
 
 SIGN = {"bank": 1, "cash": 1, "spending": -1}
+
+BASES = [("both", "Both"), ("bank", "Bank"), ("cash", "Cash on hand")]
+BASE_TEXT = {"both": "your bank + cash on hand", "bank": "your bank", "cash": "your cash on hand"}
 
 # (allocation label, title, caption, accent)
 HIGHLIGHTS = [
@@ -39,24 +42,28 @@ class DashboardTab(ttk.Frame):
     def _hero(self, s):
         card = Card(self, bg=PRIMARY, pad=20)
         b = card.body
-        lbl(b, "Money on hand", 10, fg="#BFDBFE", bg=PRIMARY).pack(anchor="w")
-        lbl(b, money(s["available"]), 30, True, "white", PRIMARY).pack(anchor="w", pady=(2, 14))
+        lbl(b, "Money on hand (bank + cash)", 10, fg="#BFDBFE", bg=PRIMARY).pack(anchor="w")
+        lbl(b, money(s["total"]), 30, True, "white", PRIMARY).pack(anchor="w", pady=(2, 14))
         row = tk.Frame(b, bg=PRIMARY)
         row.pack(fill="x")
-        for label, key in (("In the bank", "bank"), ("Cash on hand", "cash"), ("Spent", "spending")):
+        for label, key in (("In the bank", "bank"), ("Cash on hand", "cash"), ("Spent so far", "spent")):
             box = tk.Frame(row, bg=PRIMARY_MID)
             box.pack(side="left", expand=True, fill="x", padx=(0, 8))
             lbl(box, label, 9, fg="#DBEAFE", bg=PRIMARY_MID).pack(anchor="w", padx=12, pady=(8, 0))
-            lbl(box, money(s["totals"][key]), 13, True, "white", PRIMARY_MID).pack(anchor="w", padx=12, pady=(0, 8))
+            lbl(box, money(s[key]), 13, True, "white", PRIMARY_MID).pack(anchor="w", padx=12, pady=(0, 8))
         return card
 
     def _highlights(self, s):
-        """Your money on hand, split: guilt-free, investing, emergency fund, bills."""
+        """The chosen money (both / bank / cash), split: guilt-free, investing, emergency fund, bills."""
         wrap = ttk.Frame(self)
-        cash = s["available"]
-        head = (f"Based on your money on hand: {money(cash)}" if cash > 0
-                else "No money on hand yet. Add money to a Bank or Cash on hand account to see your plan.")
-        lbl(wrap, head, 11, True, TEXT, BG).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 6))
+        base, avail = s["base"], s["available"]
+        head = (f"Plan based on {BASE_TEXT[base]}: {money(avail)}" if avail > 0
+                else f"Nothing available in {BASE_TEXT[base]} yet. Add money to see your plan.")
+        lbl(wrap, head, 11, True, TEXT, BG).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        ctrl = tk.Frame(wrap, bg=BG)
+        ctrl.grid(row=0, column=2, columnspan=2, sticky="e", pady=(0, 6))
+        lbl(ctrl, "Calculate from", 9, fg=MUTED, bg=BG).pack(side="left", padx=(0, 8))
+        Segmented(ctrl, BASES, base, lambda v: settings.put("calc_base", v)).pack(side="left")
         by_label = {p["label"]: p for p in s["allocation"]}
         for i, (key, title, caption, accent) in enumerate(HIGHLIGHTS):
             wrap.columnconfigure(i, weight=1, uniform="hl")
