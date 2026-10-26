@@ -84,9 +84,10 @@ class Form(tk.Frame):
     def __init__(self, master, fields, on_submit, button="Add"):
         super().__init__(master, bg=theme.CARD)
         self.vars, self.widgets, self.labels, self.on_submit = {}, {}, {}, on_submit
+        self.cells = []
         for i, (key, label, choices, default) in enumerate(fields):
             cell = tk.Frame(self, bg=theme.CARD)
-            cell.grid(row=0, column=i, padx=(0, 12))
+            self.cells.append(cell)
             self.labels[key] = lbl(cell, label, 9, fg=theme.MUTED)
             self.labels[key].pack(anchor="w")
             var = self.vars[key] = tk.StringVar(value=default)
@@ -94,8 +95,29 @@ class Form(tk.Frame):
                 ttk.Combobox(cell, textvariable=var, values=choices, state="readonly", width=18)
                 if choices is not None else ttk.Entry(cell, textvariable=var, width=18))
             w.pack(fill="x")
-        ttk.Button(self, text=button, style="Primary.TButton",
-                   command=self._submit).grid(row=0, column=len(fields), sticky="s")
+        self.button = ttk.Button(self, text=button, style="Primary.TButton",
+                                 command=self._submit)
+        self._columns = None
+        self.bind("<Configure>", self._arrange)
+        self.after_idle(lambda: self._arrange())
+
+    def _arrange(self, event=None):
+        width = event.width if event else self.winfo_width()
+        if width <= 1:
+            return
+        cell_width = max((cell.winfo_reqwidth() for cell in self.cells), default=160)
+        columns = max(1, min(len(self.cells) + 1, width // (cell_width + 12)))
+        if columns == self._columns:
+            return
+        self._columns = columns
+        for col in range(len(self.cells) + 1):
+            self.columnconfigure(col, weight=1 if col < columns else 0)
+        for index, cell in enumerate(self.cells):
+            cell.grid(row=index // columns, column=index % columns, sticky="ew",
+                      padx=(0, 12), pady=(0, 6))
+        button_index = len(self.cells)
+        self.button.grid(row=button_index // columns, column=button_index % columns,
+                         sticky="s", pady=(0, 6))
 
     def set_label(self, key, text):
         self.labels[key].config(text=text)

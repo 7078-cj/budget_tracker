@@ -16,7 +16,9 @@ Built with Python, Tkinter and SQLite. There is nothing to install except Python
 - **Your percentages:** use sliders or enter percentages for Savings, Guilt-free, Investment, Emergency fund and Needs & bills. Adjustments keep the total at 100%.
 - **Night mode:** switch between light and dark appearance with the sidebar toggle. Your choice is saved locally.
 - **Sidebar navigation:** jump between Dashboard, Accounts, Transactions and Allocation % from the left sidebar.
-- **Dashboard:** money on hand, a four-card plan (guilt-free, invest, emergency fund, bills), a donut chart of the split, money added vs spending per month, and recent transactions. It reflows for narrower windows, scrolls vertically when needed, and refreshes by itself when you change anything.
+- **Edit records:** select an account or transaction and choose **Edit selected** to load it into the form, update it, or cancel the edit.
+- **Dashboard:** current money on hand, separate bank and cash balances, spending totals by payment source (including older spending where the source is unknown), a monthly plan that splits average cash added across savings, guilt-free spending, investment, emergency fund and bills, a cash-flow chart, and recent transactions. The plan averages up to the last six calendar months, excludes spending and bank-to-cash transfers, and counts quiet months after the first recorded addition. The dashboard reflows for narrower windows, scrolls vertically when needed, and refreshes when you change anything.
+- **Budget tracking:** choose a budget category for each spending transaction. The dashboard subtracts categorized expenses from that category's monthly allowance and shows how much remains.
 - **Emergency fund goal:** shows 3 to 6 months of your average monthly spending as a target.
 - **Local data:** everything is stored in one SQLite file on your computer.
 
@@ -33,9 +35,9 @@ On Linux you may need Tkinter first: `sudo apt install python3-tk`.
 ## How to use it
 
 1. **Accounts tab:** create your accounts, for example `BPI` (Bank), `Wallet` (Cash on hand) and `Food` (Spending).
-2. **Transactions tab:** record your current money once as a positive amount on a Bank or Cash on hand account. This is your starting balance. After that, add money whenever you receive some, and log expenses on a Spending account.
+2. **Transactions tab:** record your current money once as a positive amount on a Bank or Cash on hand account. This is your starting balance. After that, add money whenever you receive some, and log expenses on a Spending account. For each new expense, choose its budget category (such as Guilt-free, Savings, Investment, Emergency fund or Needs & bills).
 3. **Allocation % tab:** use the sliders or type percentages directly. Changing Needs & bills rebalances the other categories proportionally; changing another category updates the Needs & bills share. Press Enter or leave the field to apply a typed value.
-4. **Dashboard tab:** see your plan. Amounts are your percentages applied to your money on hand right now.
+4. **Dashboard tab:** see your monthly plan. Amounts are your percentages applied to average cash added, not your current balance; spending remains reflected in the separate money-on-hand total.
 5. Use the left sidebar to switch tabs or toggle night mode. The appearance preference is remembered the next time you open the app.
 
 Amounts are always entered as positive numbers. The account type decides whether money goes in or out. Dates use `YYYY-MM-DD`.
@@ -111,6 +113,6 @@ You need to build on Windows to get a `.exe`. PyInstaller can't cross-compile, s
 
 ## Notes and limits
 
-- Spending reduces your money on hand from the pool as a whole. It isn't deducted from one specific account.
-- If you spend more than you have, money on hand goes negative and the plan shows zeros until you add money.
+- Spending reduces money on hand from the pool as a whole. Cash-funded spending only reduces cash; bank-funded spending only reduces the bank. Older spending with no known payment source is shown separately and reduces total money on hand without being assigned to either balance. Categorized spending reduces the matching category's remaining amount for the current calendar month; older expenses without a category don't affect category remaining amounts.
+- The monthly plan uses recorded bank deposits and cash added from outside the bank. Cash withdrawals from the bank are transfers, not new money. Since the app does not distinguish opening balances from income, a starting balance recorded as a transaction can affect that month's average.
 - The 3 to 6 month emergency goal is a common rule of thumb based on the spending you have logged. Adjust to your own situation.

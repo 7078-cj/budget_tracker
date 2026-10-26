@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS transactions(
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   amount REAL NOT NULL,
   note TEXT DEFAULT '',
-  source TEXT CHECK(source IN ('bank','cash')));
+  source TEXT CHECK(source IN ('bank','cash')),
+  bucket_id INTEGER REFERENCES buckets(id));
 CREATE TABLE IF NOT EXISTS buckets(
   id INTEGER PRIMARY KEY,
   label TEXT NOT NULL UNIQUE,
@@ -51,9 +52,13 @@ def _migrate_transactions(conn):
     if "source" in [r["name"] for r in conn.execute("PRAGMA table_info(transactions)")]:
         return
     conn.execute("ALTER TABLE transactions ADD COLUMN source TEXT CHECK(source IN ('bank','cash'))")
-    # earlier versions pooled all spending; treat what's already recorded as paid from the bank
-    conn.execute("UPDATE transactions SET source='bank' "
-                 "WHERE account_id IN (SELECT id FROM accounts WHERE type='spending')")
+
+def _migrate_transaction_buckets(conn):
+    """Allow spending transactions to be assigned to an allocation bucket."""
+    columns = [r["name"] for r in conn.execute("PRAGMA table_info(transactions)")]
+    if "bucket_id" not in columns:
+        conn.execute("ALTER TABLE transactions ADD COLUMN bucket_id "
+                     "INTEGER REFERENCES buckets(id)")
 
 def _migrate_allocation(conn):
     """Make the previous needs-and-bills remainder an editable allocation bucket."""
@@ -75,6 +80,7 @@ def get_conn():
         _conn.executescript(SCHEMA)
         _migrate_accounts(_conn)
         _migrate_transactions(_conn)
+        _migrate_transaction_buckets(_conn)
         _conn.executemany("INSERT OR IGNORE INTO buckets(label, percent) VALUES(?,?)", DEFAULT_BUCKETS)
         _migrate_allocation(_conn)
         _conn.commit()
@@ -104,6 +110,8 @@ class Repository:
                        args=[v[c] for c in self.columns])
 
     def update(self, id_, **v):
+        if not v or any(column not in self.columns for column in v):
+            raise ValueError("No valid fields to update")
         sets = ",".join(f"{c}=?" for c in v)
         execute(f"UPDATE {self.table} SET {sets} WHERE id=?", args=[*v.values(), id_])
 

@@ -12,6 +12,9 @@ class AccountsTab(CrudTab):
     def to_record(self, v):
         return {"name": v["name"], "type": BY_LABEL[v["type"]]}
 
+    def form_values_for(self, row):
+        return {"name": row["name"], "type": TYPE_LABELS[row["type"]]}
+
     def rows(self):
         return [{**a, "type": TYPE_LABELS[a["type"]], "balance": money(a["balance"])}
                 for a in accounts.with_balances()]

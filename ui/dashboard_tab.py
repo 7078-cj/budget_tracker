@@ -8,15 +8,20 @@ from .widgets import Card, Segmented, lbl, money
 
 SIGN = {"bank": 1, "cash": 1, "spending": -1}
 
-BASES = [("both", "Both"), ("bank", "Bank"), ("cash", "Cash on hand")]
-BASE_TEXT = {"both": "your bank + cash on hand", "bank": "your bank", "cash": "your cash on hand"}
+BASES = [("both", "Both"), ("bank", "Bank"), ("cash", "Cash added")]
+BASE_TEXT = {
+    "both": "bank + cash added",
+    "bank": "bank deposits",
+    "cash": "cash added outside bank withdrawals",
+}
 
-# (allocation label, title, caption, accent)
+# (allocation label, title, accent)
 HIGHLIGHTS = [
-    ("Guilt-free", "Guilt-free money", "you can spend right now", "#60A5FA"),
-    ("Investment", "Money to invest", "available to invest", "primary"),
-    ("Emergency fund", "Emergency fund", "to put in your emergency fund", "primary_dark"),
-    (REST_LABEL, "Needs & bills", "for bills & essentials", "muted"),
+    ("Savings", "Savings", "#29B6C8"),
+    ("Guilt-free", "Guilt-free money", "#60A5FA"),
+    ("Investment", "Money to invest", "primary"),
+    ("Emergency fund", "Emergency fund", "primary_dark"),
+    (REST_LABEL, "Needs & bills", "muted"),
 ]
 
 class DashboardTab(ttk.Frame):
@@ -65,7 +70,13 @@ class DashboardTab(ttk.Frame):
         row = tk.Frame(b, bg=theme.PRIMARY)
         row.pack(fill="x")
         self.metric_boxes = []
-        for label, key in (("In the bank", "bank"), ("Cash on hand", "cash"), ("Spent so far", "spent")):
+        for label, key in (
+            ("In the bank", "bank"),
+            ("Cash on hand", "cash"),
+            ("Spent from bank", "spent_bank"),
+            ("Spent from cash", "spent_cash"),
+            ("Spent source unknown", "spent_unassigned"),
+        ):
             box = tk.Frame(row, bg=theme.PRIMARY_MID, highlightthickness=1,
                            highlightbackground=theme.PRIMARY_LT)
             self.metric_boxes.append(box)
@@ -74,20 +85,21 @@ class DashboardTab(ttk.Frame):
         return card
 
     def _highlights(self, s):
-        """The chosen money (both / bank / cash), split: guilt-free, investing, emergency fund, bills."""
+        """Split average monthly cash added into the configured allocation buckets."""
         wrap = ttk.Frame(self.content)
-        base, avail = s["base"], s["available"]
-        head = (f"Plan based on {BASE_TEXT[base]}: {money(avail)}" if avail > 0
-                else f"Nothing available in {BASE_TEXT[base]} yet. Add money to see your plan.")
+        base, monthly_added = s["base"], s["monthly_added"]
+        head = (f"Monthly plan from average {BASE_TEXT[base]} (up to 6 months): "
+                f"{money(monthly_added)}"
+                if monthly_added > 0 else f"No {BASE_TEXT[base]} recorded yet.")
         self.plan_heading = tk.Label(wrap, text=head, font=(theme.FONT, 11, "bold"),
                                      fg=theme.TEXT, bg=theme.BG, justify="left", anchor="w")
         ctrl = tk.Frame(wrap, bg=theme.BG)
         self.plan_controls = ctrl
-        lbl(ctrl, "Calculate from", 9, fg=theme.MUTED, bg=theme.BG).pack(side="left", padx=(0, 8))
+        lbl(ctrl, "Average based on", 9, fg=theme.MUTED, bg=theme.BG).pack(side="left", padx=(0, 8))
         Segmented(ctrl, BASES, base, lambda v: settings.put("calc_base", v)).pack(side="left")
         by_label = {p["label"]: p for p in s["allocation"]}
         self.highlight_cards = []
-        for i, (key, title, caption, accent) in enumerate(HIGHLIGHTS):
+        for i, (key, title, accent) in enumerate(HIGHLIGHTS):
             p = by_label[key]
             accent = (theme.PRIMARY if accent == "primary" else
                       theme.PRIMARY_DK if accent == "primary_dark" else
@@ -102,8 +114,13 @@ class DashboardTab(ttk.Frame):
             lbl(top, title, 10, True).pack(side="left")
             tk.Label(top, text=f"{p['percent']:g}%", bg=theme.PRIMARY_LT, fg=theme.TEXT,
                      font=("Segoe UI", 9, "bold"), padx=9, pady=3).pack(side="right")
-            lbl(inner, money(p["amount"]), 18, True, accent).pack(anchor="w", pady=(10, 1))
-            lbl(inner, caption, 9, fg=theme.MUTED).pack(anchor="w")
+            lbl(inner, money(p["remaining"]), 18, True, accent).pack(anchor="w", pady=(10, 1))
+            lbl(inner, f"left this month of {money(p['amount'])}", 9,
+                fg=theme.MUTED).pack(anchor="w")
+            spent_text = (f"Over allocation by {money(p['over'])}" if p["over"] else
+                          f"Spent this month: {money(p['spent'])}")
+            lbl(inner, spent_text, 9, fg=theme.BAD if p["over"] else theme.MUTED).pack(
+                anchor="w", pady=(3, 0))
             if key == "Emergency fund":
                 lo, hi = stats.emergency_target()
                 note = (f"Goal: {money(lo)} to {money(hi)} (3 to 6 months of spending)"
@@ -115,12 +132,12 @@ class DashboardTab(ttk.Frame):
     def _allocation(self, s):
         card = Card(self.content)
         b = card.body
-        lbl(b, "Allocation", 12, True).pack(anchor="w")
-        lbl(b, "Your money by category", 9, fg=theme.MUTED).pack(anchor="w", pady=(2, 8))
+        lbl(b, "Monthly allocation", 12, True).pack(anchor="w")
+        lbl(b, "Average monthly cash split", 9, fg=theme.MUTED).pack(anchor="w", pady=(2, 8))
         canvas = tk.Canvas(b, width=190, height=190, bg=theme.CARD, highlightthickness=0)
         canvas.pack(anchor="center")
-        self.allocation_parts = s["allocation"]
-        self.allocation_amount = max(s["available"], 0)
+        self.allocation_parts = [{**p, "amount": p["remaining"]} for p in s["allocation"]]
+        self.allocation_amount = sum(p["remaining"] for p in s["allocation"])
         self.donut_canvas = canvas
         b.bind("<Configure>", self._resize_donut)
         for i, p in enumerate(s["allocation"]):
@@ -130,7 +147,7 @@ class DashboardTab(ttk.Frame):
             dot.pack(side="left", padx=(10, 8), pady=8)
             dot.create_oval(2, 2, 10, 10, fill=theme.PALETTE[i % len(theme.PALETTE)], outline="")
             lbl(row, p["label"], 9, True).pack(side="left", pady=7)
-            lbl(row, f"{p['percent']:g}%  ·  {money(p['amount'])}", 9,
+            lbl(row, f"Left {money(p['remaining'])} / {money(p['amount'])}", 9,
                 fg=theme.MUTED, bg=theme.SURFACE_ALT).pack(side="right", padx=10)
         return card
 
@@ -174,9 +191,9 @@ class DashboardTab(ttk.Frame):
         if width <= 1:
             return
         main_columns = 3 if width >= 1050 else 2 if width >= 680 else 1
-        highlight_columns = 4 if width >= 1000 else 2 if width >= 560 else 1
-        metric_columns = 3 if width >= 600 else 1
-        self.plan_heading.configure(wraplength=max(width - (340 if highlight_columns == 4 else 24),
+        highlight_columns = 5 if width >= 1300 else 3 if width >= 900 else 2 if width >= 560 else 1
+        metric_columns = 5 if width >= 1300 else 4 if width >= 1000 else 2 if width >= 600 else 1
+        self.plan_heading.configure(wraplength=max(width - (340 if highlight_columns == 5 else 24),
                                                   180))
         layout = (main_columns, highlight_columns, metric_columns)
         if layout == self._layout:
@@ -188,8 +205,8 @@ class DashboardTab(ttk.Frame):
                                          uniform="dashboard" if col < main_columns else "")
         self.hero.grid(row=0, column=0, columnspan=main_columns, sticky="nsew", pady=(0, 8))
         self.highlights.grid(row=1, column=0, columnspan=main_columns, sticky="nsew", pady=(0, 8))
-        stacked_header = highlight_columns < 4
-        for col in range(4):
+        stacked_header = highlight_columns < 5
+        for col in range(len(self.highlight_cards)):
             self.highlights.columnconfigure(
                 col, weight=1 if col < highlight_columns else 0,
                 uniform="highlights" if col < highlight_columns else "")
@@ -222,12 +239,10 @@ class DashboardTab(ttk.Frame):
             self.monthly.grid(row=3, column=0, sticky="nsew", pady=(0, 8))
             self.recent.grid(row=4, column=0, sticky="nsew")
 
-        for col in range(3):
-            self.metric_boxes[col].grid(row=0 if metric_columns == 3 else col,
-                                        column=col if metric_columns == 3 else 0,
-                                        sticky="nsew",
-                                        padx=(0, 8) if metric_columns == 3 and col < 2 else 0,
-                                        pady=1)
+        for col, box in enumerate(self.metric_boxes):
+            box.grid(row=col // metric_columns, column=col % metric_columns,
+                     sticky="nsew", padx=(0, 8) if col % metric_columns < metric_columns - 1 else 0,
+                     pady=1)
         for col in range(metric_columns):
             self.metric_boxes[0].master.columnconfigure(col, weight=1)
         self._resize_donut()
