@@ -1,17 +1,19 @@
 """Pure functions: no database, no UI."""
 
-REST_LABEL = "Needs & bills (rest)"
+import math
+
+REST_LABEL = "Needs & bills"
 
 def validate(percents):
+    if any(not math.isfinite(p) for p in percents):
+        raise ValueError("Percentages must be finite numbers")
     if any(p < 0 for p in percents):
         raise ValueError("Percentages can't be negative")
-    if sum(percents) > 100.0001:
-        raise ValueError(f"Total is {sum(percents):g}%, it can't exceed 100%")
+    total = sum(percents)
+    if abs(total - 100) > 0.0001:
+        raise ValueError(f"Percentages must add up to 100% (currently {total:g}%)")
 
 def split(amount, buckets):
-    """Split `amount` across buckets; whatever is left goes to needs & bills."""
-    parts = [{"label": b["label"], "percent": b["percent"], "amount": amount * b["percent"] / 100}
-             for b in buckets]
-    rest = 100 - sum(b["percent"] for b in buckets)
-    parts.append({"label": REST_LABEL, "percent": rest, "amount": amount * rest / 100})
-    return parts
+    """Split `amount` across the explicitly configured allocation buckets."""
+    return [{"label": b["label"], "percent": b["percent"], "amount": amount * b["percent"] / 100}
+            for b in buckets]

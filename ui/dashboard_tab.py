@@ -17,7 +17,7 @@ HIGHLIGHTS = [
     ("Guilt-free", "Guilt-free money", "you can spend right now", "#60A5FA"),
     ("Investment", "Money to invest", "available to invest", PRIMARY),
     ("Emergency fund", "Emergency fund", "to put in your emergency fund", PRIMARY_DK),
-    (REST_LABEL, "Bills", "to keep for bills & essentials", "#64748B"),
+    (REST_LABEL, "Needs & bills", "for bills & essentials", "#64748B"),
 ]
 
 class DashboardTab(ttk.Frame):

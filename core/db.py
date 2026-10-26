@@ -3,6 +3,7 @@ import os
 import sqlite3
 from pathlib import Path
 from . import events
+from .allocation import REST_LABEL
 
 DB_PATH = Path(os.environ.get("BUDGET_DB", Path.home() / ".budget_tracker" / "budget.db"))
 
@@ -54,6 +55,14 @@ def _migrate_transactions(conn):
     conn.execute("UPDATE transactions SET source='bank' "
                  "WHERE account_id IN (SELECT id FROM accounts WHERE type='spending')")
 
+def _migrate_allocation(conn):
+    """Make the previous needs-and-bills remainder an editable allocation bucket."""
+    if conn.execute("SELECT 1 FROM buckets WHERE label=?", (REST_LABEL,)).fetchone():
+        return
+    allocated = conn.execute("SELECT COALESCE(SUM(percent), 0) FROM buckets").fetchone()[0]
+    conn.execute("INSERT INTO buckets(label, percent) VALUES(?, ?)",
+                 (REST_LABEL, max(0, 100 - allocated)))
+
 _conn = None
 
 def get_conn():
@@ -67,6 +76,7 @@ def get_conn():
         _migrate_accounts(_conn)
         _migrate_transactions(_conn)
         _conn.executemany("INSERT OR IGNORE INTO buckets(label, percent) VALUES(?,?)", DEFAULT_BUCKETS)
+        _migrate_allocation(_conn)
         _conn.commit()
     return _conn
 

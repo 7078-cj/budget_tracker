@@ -22,7 +22,7 @@ class AllocationTab(ttk.Frame):
         card.pack(anchor="nw")
         b = card.body
         lbl(b, "Income allocation", 14, True).grid(row=0, column=0, columnspan=3, sticky="w")
-        lbl(b, "Choose what % of every income goes to each bucket.", 10, fg=MUTED)\
+        lbl(b, "Set each percentage. Your allocations must add up to 100%.", 10, fg=MUTED)\
             .grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 14))
         self.vars = {}
         for i, x in enumerate(buckets.all(), start=2):
@@ -56,8 +56,13 @@ class AllocationTab(ttk.Frame):
             w = BAR_W * max(p, 0) / 100
             self.bar.create_rectangle(x, 0, min(x + w, BAR_W), 14, fill=PALETTE[i % len(PALETTE)], width=0)
             x += w
-        self.total.config(text=f"Allocated {t:g}%  ·  Needs & bills {100 - t:g}%",
-                          fg=BAD if t > 100 else PRIMARY_DK)
+        if t < 99.9999:
+            text, color = f"Allocated {t:g}%  ·  {100 - t:g}% remaining", BAD
+        elif t > 100.0001:
+            text, color = f"Allocated {t:g}%  ·  {t - 100:g}% over", BAD
+        else:
+            text, color = "Total allocation 100%", PRIMARY_DK
+        self.total.config(text=text, fg=color)
 
     def save(self):
         try:
