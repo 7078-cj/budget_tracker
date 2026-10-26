@@ -15,7 +15,7 @@ def run():
     root = tk.Tk()
     root.title("Budget Tracker")
     root.geometry("1180x780")
-    root.minsize(980, 680)
+    root.minsize(760, 600)
     mode = settings.get("theme")
     mode = mode if mode in theme.PALETTES else "light"
     theme.apply(root, mode)

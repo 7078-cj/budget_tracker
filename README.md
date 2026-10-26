@@ -16,7 +16,7 @@ Built with Python, Tkinter and SQLite. There is nothing to install except Python
 - **Your percentages:** use sliders or enter percentages for Savings, Guilt-free, Investment, Emergency fund and Needs & bills. Adjustments keep the total at 100%.
 - **Night mode:** switch between light and dark appearance with the sidebar toggle. Your choice is saved locally.
 - **Sidebar navigation:** jump between Dashboard, Accounts, Transactions and Allocation % from the left sidebar.
-- **Dashboard:** money on hand, a four-card plan (guilt-free, invest, emergency fund, bills), a donut chart of the split, money added vs spending per month, and recent transactions. It refreshes by itself when you change anything.
+- **Dashboard:** money on hand, a four-card plan (guilt-free, invest, emergency fund, bills), a donut chart of the split, money added vs spending per month, and recent transactions. It reflows for narrower windows, scrolls vertically when needed, and refreshes by itself when you change anything.
 - **Emergency fund goal:** shows 3 to 6 months of your average monthly spending as a target.
 - **Local data:** everything is stored in one SQLite file on your computer.
 
