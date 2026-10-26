@@ -32,6 +32,10 @@ python main.py
 
 On Linux you may need Tkinter first: `sudo apt install python3-tk`.
 
+## Mobile app
+
+The Expo React Native app lives in [mobile/](./mobile/). It uses its own SQLite database and provides a mobile version of the budgeting workflow. See [mobile/README.md](./mobile/README.md) for setup and architecture details.
+
 ## How to use it
 
 1. **Accounts tab:** create your accounts, for example `BPI` (Bank), `Wallet` (Cash on hand) and `Food` (Spending).
