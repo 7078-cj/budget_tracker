@@ -3,6 +3,7 @@
 An Expo React Native companion app with its own local SQLite database. It provides the same core budget flow as the desktop app:
 
 - Separate bank and cash balances, with cash withdrawals recorded as transfers.
+- Savings accounts with contribution transactions that identify bank or cash as their source, subtract contributions from that balance, count contributions against the Savings allocation, and show an aggregate saved balance on the dashboard.
 - Source-specific spending and per-category monthly remaining amounts.
 - Average monthly cash-added allocation across savings, guilt-free, investment, emergency fund, and needs/bills.
 - Account and transaction create, edit, and delete.

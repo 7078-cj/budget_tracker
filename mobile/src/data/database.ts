@@ -14,7 +14,8 @@ export async function initializeDatabase(database: SQLiteDatabase): Promise<void
     CREATE TABLE IF NOT EXISTS accounts (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
-      type TEXT NOT NULL CHECK(type IN ('bank', 'cash', 'spending'))
+      type TEXT NOT NULL CHECK(type IN ('bank', 'cash', 'spending')),
+      is_savings INTEGER NOT NULL DEFAULT 0 CHECK(is_savings IN (0, 1))
     );
     CREATE TABLE IF NOT EXISTS buckets (
       id INTEGER PRIMARY KEY,
@@ -35,6 +36,13 @@ export async function initializeDatabase(database: SQLiteDatabase): Promise<void
       value TEXT NOT NULL
     );
   `);
+
+  const accountColumns = await database.getAllAsync<{ name: string }>('PRAGMA table_info(accounts)');
+  if (!accountColumns.some((column) => column.name === 'is_savings')) {
+    await database.execAsync(
+      'ALTER TABLE accounts ADD COLUMN is_savings INTEGER NOT NULL DEFAULT 0 CHECK(is_savings IN (0, 1))',
+    );
+  }
 
   const columns = await database.getAllAsync<{ name: string }>('PRAGMA table_info(transactions)');
   const columnNames = new Set(columns.map((column) => column.name));

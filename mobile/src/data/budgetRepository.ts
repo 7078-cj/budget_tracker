@@ -20,7 +20,11 @@ import type {
 } from '../domain/types';
 
 export async function getAccounts(database: SQLiteDatabase): Promise<Account[]> {
-  return database.getAllAsync<Account>('SELECT id, name, type FROM accounts ORDER BY name');
+  return database.getAllAsync<Account>(
+    `SELECT id, name,
+            CASE WHEN is_savings = 1 THEN 'savings' ELSE type END AS type
+     FROM accounts ORDER BY name`,
+  );
 }
 
 export async function saveAccount(
@@ -29,12 +33,20 @@ export async function saveAccount(
   id?: number,
 ): Promise<void> {
   const name = validateAccount(input.name, input.type);
+  const storedType = input.type === 'savings' ? 'bank' : input.type;
+  const isSavings = input.type === 'savings' ? 1 : 0;
   if (id === undefined) {
-    await database.runAsync('INSERT INTO accounts(name, type) VALUES (?, ?)', name, input.type);
+    await database.runAsync(
+      'INSERT INTO accounts(name, type, is_savings) VALUES (?, ?, ?)',
+      name,
+      storedType,
+      isSavings,
+    );
     return;
   }
   const current = await database.getFirstAsync<{ type: AccountType }>(
-    'SELECT type FROM accounts WHERE id = ?',
+    `SELECT CASE WHEN is_savings = 1 THEN 'savings' ELSE type END AS type
+     FROM accounts WHERE id = ?`,
     id,
   );
   if (!current) throw new Error('Account no longer exists.');
@@ -45,7 +57,13 @@ export async function saveAccount(
     );
     if (used) throw new Error('Account type cannot change after transactions are recorded.');
   }
-  await database.runAsync('UPDATE accounts SET name = ?, type = ? WHERE id = ?', name, input.type, id);
+  await database.runAsync(
+    'UPDATE accounts SET name = ?, type = ?, is_savings = ? WHERE id = ?',
+    name,
+    storedType,
+    isSavings,
+    id,
+  );
 }
 
 export async function deleteAccount(database: SQLiteDatabase, id: number): Promise<void> {
@@ -70,7 +88,8 @@ export async function savePercentages(
 
 export async function getTransactions(database: SQLiteDatabase): Promise<Transaction[]> {
   return database.getAllAsync<Transaction>(`
-    SELECT t.id, t.date, t.account_id, a.name AS account, a.type,
+    SELECT t.id, t.date, t.account_id, a.name AS account,
+           CASE WHEN a.is_savings = 1 THEN 'savings' ELSE a.type END AS type,
            t.amount, t.note, t.source, t.bucket_id, b.label AS budget
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
@@ -85,7 +104,8 @@ export async function saveTransaction(
   id?: number,
 ): Promise<void> {
   const account = await database.getFirstAsync<{ type: AccountType }>(
-    'SELECT type FROM accounts WHERE id = ?',
+    `SELECT CASE WHEN is_savings = 1 THEN 'savings' ELSE type END AS type
+     FROM accounts WHERE id = ?`,
     input.accountId,
   );
   if (!account) throw new Error('Select an account.');
@@ -97,11 +117,14 @@ export async function saveTransaction(
     bucketId: input.bucketId,
   });
   if (input.bucketId !== null) {
-    const bucket = await database.getFirstAsync<{ id: number }>(
-      'SELECT id FROM buckets WHERE id = ?',
+    const bucket = await database.getFirstAsync<{ id: number; label: string }>(
+      'SELECT id, label FROM buckets WHERE id = ?',
       input.bucketId,
     );
     if (!bucket) throw new Error('Select a valid budget category.');
+    if (account.type === 'savings' && bucket.label !== 'Savings') {
+      throw new Error('Savings contributions must use the Savings category.');
+    }
   }
 
   const values = [
@@ -162,14 +185,20 @@ export async function getDashboardSummary(
     spentCash: number;
     spentBank: number;
     spentUnknown: number;
+    savings: number;
+    savingsFromBank: number;
+    savingsFromCash: number;
   }>(`
     SELECT
-      COALESCE(SUM(CASE WHEN a.type = 'bank' THEN t.amount END), 0) AS bankIn,
+      COALESCE(SUM(CASE WHEN a.type = 'bank' AND a.is_savings = 0 THEN t.amount END), 0) AS bankIn,
       COALESCE(SUM(CASE WHEN a.type = 'cash' THEN t.amount END), 0) AS cashIn,
       COALESCE(SUM(CASE WHEN a.type = 'cash' AND t.source = 'bank' THEN t.amount END), 0) AS withdrawn,
       COALESCE(SUM(CASE WHEN a.type = 'spending' AND t.source = 'cash' THEN t.amount END), 0) AS spentCash,
       COALESCE(SUM(CASE WHEN a.type = 'spending' AND t.source = 'bank' THEN t.amount END), 0) AS spentBank,
-      COALESCE(SUM(CASE WHEN a.type = 'spending' AND t.source IS NULL THEN t.amount END), 0) AS spentUnknown
+      COALESCE(SUM(CASE WHEN a.type = 'spending' AND t.source IS NULL THEN t.amount END), 0) AS spentUnknown,
+      COALESCE(SUM(CASE WHEN a.is_savings = 1 THEN t.amount END), 0) AS savings,
+      COALESCE(SUM(CASE WHEN a.is_savings = 1 AND t.source = 'bank' THEN t.amount END), 0) AS savingsFromBank,
+      COALESCE(SUM(CASE WHEN a.is_savings = 1 AND t.source = 'cash' THEN t.amount END), 0) AS savingsFromCash
     FROM transactions t JOIN accounts a ON a.id = t.account_id
   `);
   const balances = calculateBalances({
@@ -179,6 +208,9 @@ export async function getDashboardSummary(
     spentCash: totals?.spentCash ?? 0,
     spentBank: totals?.spentBank ?? 0,
     spentUnknown: totals?.spentUnknown ?? 0,
+    savings: totals?.savings ?? 0,
+    savingsFromBank: totals?.savingsFromBank ?? 0,
+    savingsFromCash: totals?.savingsFromCash ?? 0,
   });
   const today = new Date();
   const startMonthDate = new Date(today.getFullYear(), today.getMonth() - 5, 1);
@@ -191,11 +223,11 @@ export async function getDashboardSummary(
     cashAdded: number;
   }>(
     `SELECT substr(t.date, 1, 7) AS month,
-            SUM(CASE WHEN a.type = 'bank' THEN t.amount ELSE 0 END) AS bankAdded,
+            SUM(CASE WHEN a.type = 'bank' AND a.is_savings = 0 THEN t.amount ELSE 0 END) AS bankAdded,
             SUM(CASE WHEN a.type = 'cash' AND IFNULL(t.source, '') != 'bank'
                      THEN t.amount ELSE 0 END) AS cashAdded
      FROM transactions t JOIN accounts a ON a.id = t.account_id
-     WHERE t.date >= ? AND t.date < ? AND a.type IN ('bank', 'cash')
+     WHERE t.date >= ? AND t.date < ? AND a.type IN ('bank', 'cash') AND a.is_savings = 0
      GROUP BY month ORDER BY month`,
     `${isoMonth(startMonthDate)}-01`,
     `${isoMonth(endMonth)}-01`,
@@ -208,7 +240,7 @@ export async function getDashboardSummary(
   const spending = await database.getAllAsync<{ bucket_id: number; spent: number }>(
     `SELECT t.bucket_id, SUM(t.amount) AS spent
      FROM transactions t JOIN accounts a ON a.id = t.account_id
-     WHERE a.type = 'spending' AND t.bucket_id IS NOT NULL
+     WHERE (a.type = 'spending' OR a.is_savings = 1) AND t.bucket_id IS NOT NULL
        AND t.date >= ? AND t.date < ?
      GROUP BY t.bucket_id`,
     monthStart,

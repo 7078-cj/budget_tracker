@@ -16,6 +16,7 @@ export const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
   { value: 'bank', label: 'Bank' },
   { value: 'cash', label: 'Cash on hand' },
   { value: 'spending', label: 'Spending' },
+  { value: 'savings', label: 'Savings' },
 ];
 export const PAYMENT_SOURCES: { value: PaymentSource; label: string }[] = [
   { value: 'bank', label: 'Bank' },
@@ -35,18 +36,22 @@ export interface BalanceTotals {
   spentCash: number;
   spentBank: number;
   spentUnknown: number;
+  savings: number;
+  savingsFromBank: number;
+  savingsFromCash: number;
 }
 
 export function calculateBalances(totals: BalanceTotals) {
-  const bank = totals.bankIn - totals.withdrawn - totals.spentBank;
-  const cash = totals.cashIn - totals.spentCash;
+  const bank = totals.bankIn - totals.withdrawn - totals.spentBank - totals.savingsFromBank;
+  const cash = totals.cashIn - totals.spentCash - totals.savingsFromCash;
   return {
     bank,
     cash,
     spentBank: totals.spentBank,
     spentCash: totals.spentCash,
     spentUnknown: totals.spentUnknown,
-    total: bank + cash - totals.spentUnknown,
+    savings: totals.savings,
+    total: bank + cash + totals.savings - totals.spentUnknown,
   };
 }
 
@@ -186,11 +191,14 @@ export function validateTransaction(input: {
   if (input.accountType === 'spending' && input.bucketId === null) {
     throw new Error('Choose a budget category.');
   }
-  if (input.accountType !== 'spending' && input.bucketId !== null) {
+  if (input.accountType !== 'spending' && input.accountType !== 'savings' && input.bucketId !== null) {
     throw new Error('Only spending transactions can have a budget category.');
   }
   if (input.accountType === 'bank' && input.source !== null) {
     throw new Error('Bank deposits do not have a payment source.');
+  }
+  if (input.accountType === 'savings' && (!input.source || input.bucketId === null)) {
+    throw new Error('Choose whether the savings contribution came from bank or cash.');
   }
   if (input.accountType === 'cash' && input.source !== null && input.source !== 'bank') {
     throw new Error('Cash additions can only be marked as a bank withdrawal.');

@@ -58,8 +58,8 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
     setTransactions(transactionRows);
     if (accountId < 0 && accountRows.length > 0) {
       setAccountId(accountRows[0].id);
-      setSource(accountRows[0].type === 'spending' ? 'bank' : null);
-      setBucketId(accountRows[0].type === 'spending' ? bucketRows[0]?.id ?? null : null);
+      setSource(accountRows[0].type === 'spending' || accountRows[0].type === 'savings' ? 'bank' : null);
+      setBucketId(defaultBucketId(accountRows[0].type, bucketRows));
     }
   }, [accountId, database]);
 
@@ -76,8 +76,8 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
   function selectAccount(id: number) {
     const account = accounts.find((item) => item.id === id);
     setAccountId(id);
-    setSource(account?.type === 'spending' ? 'bank' : null);
-    setBucketId(account?.type === 'spending' ? buckets[0]?.id ?? null : null);
+    setSource(account?.type === 'spending' || account?.type === 'savings' ? 'bank' : null);
+    setBucketId(account ? defaultBucketId(account.type, buckets) : null);
   }
 
   function resetForm() {
@@ -88,8 +88,8 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
     setNote('');
     const initialAccount = accounts[0];
     setAccountId(initialAccount?.id ?? -1);
-    setSource(initialAccount?.type === 'spending' ? 'bank' : null);
-    setBucketId(initialAccount?.type === 'spending' ? buckets[0]?.id ?? null : null);
+    setSource(initialAccount?.type === 'spending' || initialAccount?.type === 'savings' ? 'bank' : null);
+    setBucketId(initialAccount ? defaultBucketId(initialAccount.type, buckets) : null);
     setError(null);
   }
 
@@ -100,8 +100,8 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
     setNote('');
     const initialAccount = accounts[0];
     setAccountId(initialAccount?.id ?? -1);
-    setSource(initialAccount?.type === 'spending' ? 'bank' : null);
-    setBucketId(initialAccount?.type === 'spending' ? buckets[0]?.id ?? null : null);
+    setSource(initialAccount?.type === 'spending' || initialAccount?.type === 'savings' ? 'bank' : null);
+    setBucketId(initialAccount ? defaultBucketId(initialAccount.type, buckets) : null);
     setError(null);
     setFormVisible(true);
   }
@@ -127,12 +127,14 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
           accountId,
           amount: Number(amount),
           note,
-          source: selectedAccount?.type === 'spending'
+          source: selectedAccount?.type === 'spending' || selectedAccount?.type === 'savings'
             ? source === 'bank' || source === 'cash' ? source : null
             : selectedAccount?.type === 'cash'
               ? source === 'bank' ? 'bank' : null
               : null,
-          bucketId: selectedAccount?.type === 'spending' ? bucketId : null,
+          bucketId: selectedAccount?.type === 'spending' || selectedAccount?.type === 'savings'
+            ? bucketId
+            : null,
         },
         editingId,
       );
@@ -180,9 +182,11 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
               <Muted>
                 {transaction.date} · {transaction.type === 'spending'
                   ? `${transaction.source === 'cash' ? 'Cash' : transaction.source === 'bank' ? 'Bank' : 'Source unknown'} · ${transaction.budget ?? 'Uncategorized'}`
-                  : transaction.type === 'cash' && transaction.source === 'bank'
-                    ? 'Cash withdrawal from bank'
-                    : ACCOUNT_TYPES.find((type) => type.value === transaction.type)?.label}
+                  : transaction.type === 'savings'
+                    ? `Savings from ${transaction.source === 'cash' ? 'cash' : transaction.source === 'bank' ? 'bank' : 'unknown source'}`
+                    : transaction.type === 'cash' && transaction.source === 'bank'
+                      ? 'Cash withdrawal from bank'
+                      : ACCOUNT_TYPES.find((type) => type.value === transaction.type)?.label}
               </Muted>
               {transaction.note ? (
                 <Muted numberOfLines={1}>{transaction.note}</Muted>
@@ -240,6 +244,20 @@ export function TransactionsScreen({ onChanged }: { onChanged: () => void }) {
               placeholder="0.00"
               keyboardType="decimal-pad"
             />
+            {selectedAccount?.type === 'savings' ? (
+              <>
+                <ChoiceRow
+                  label="Savings contribution from"
+                  options={[
+                    { value: 'unknown', label: 'Choose source' },
+                    ...PAYMENT_SOURCES,
+                  ]}
+                  value={source ?? 'unknown'}
+                  onChange={(value) => setSource(value === 'unknown' ? null : value)}
+                />
+                <Muted>This amount will be deducted from the selected account balance.</Muted>
+              </>
+            ) : null}
             {selectedAccount?.type === 'spending' ? (
               <>
                 <ChoiceRow
@@ -334,7 +352,15 @@ const styles = StyleSheet.create({
   },
 });
 
+function defaultBucketId(accountType: Account['type'], buckets: Bucket[]): number | null {
+  if (accountType === 'savings') {
+    return buckets.find((bucket) => bucket.label === 'Savings')?.id ?? null;
+  }
+  return accountType === 'spending' ? buckets[0]?.id ?? null : null;
+}
+
 function transactionIcon(transaction: Transaction): IconName {
+  if (transaction.type === 'savings') return 'savings';
   if (transaction.type === 'spending') return 'spending';
   if (transaction.type === 'cash') return 'cash';
   return 'bank';

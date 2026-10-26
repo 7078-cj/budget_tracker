@@ -1,4 +1,4 @@
-export type AccountType = 'bank' | 'cash' | 'spending';
+export type AccountType = 'bank' | 'cash' | 'spending' | 'savings';
 export type PaymentSource = 'bank' | 'cash';
 export type CalculationBase = 'both' | 'bank' | 'cash';
 export type AppTheme = 'light' | 'night';
@@ -41,6 +41,7 @@ export interface DashboardSummary {
   spentBank: number;
   spentCash: number;
   spentUnknown: number;
+  savings: number;
   total: number;
   monthlyAdded: number;
   base: CalculationBase;

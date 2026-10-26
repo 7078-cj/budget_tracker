@@ -148,6 +148,7 @@ export function AccountsScreen({ onChanged }: { onChanged: () => void }) {
 }
 
 function accountIcon(type: Account['type']): IconName {
+  if (type === 'savings') return 'savings';
   return type === 'bank' ? 'bank' : type === 'cash' ? 'cash' : 'spending';
 }
 

@@ -144,6 +144,10 @@ export function DashboardScreen({
                   <Text style={styles.balanceValue}>{formatMoney(summary.cash)}</Text>
                 </View>
               </Row>
+              <View style={styles.savedBalance}>
+                <Muted>Saved in savings accounts</Muted>
+                <Text style={styles.savedAmount}>{formatMoney(summary.savings)}</Text>
+              </View>
               <View style={styles.spending}>
                 <Muted>Spent from bank: {formatMoney(summary.spentBank)}</Muted>
                 <Muted>Spent from cash: {formatMoney(summary.spentCash)}</Muted>
@@ -287,6 +291,18 @@ const styles = StyleSheet.create({
   spending: {
     gap: spacing.xs,
     marginTop: spacing.md,
+  },
+  savedBalance: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 10,
+    marginTop: spacing.md,
+    padding: spacing.md,
+  },
+  savedAmount: {
+    color: colors.primary,
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: spacing.xs,
   },
   monthlyAmount: {
     color: colors.primary,
